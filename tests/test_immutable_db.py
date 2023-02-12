@@ -46,3 +46,29 @@ def test_user(db_session):
     o = db_session.query(models.User).where(models.User.uuid == user.uuid).one()
     assert o.uuid == user.uuid
 
+
+def test_delete_user(db_session):
+
+    user = models.User()
+    db_session.add(user)
+    db_session.commit()
+    assert user.uuid
+
+    o = db_session.query(models.User).where(models.User.uuid == user.uuid).one()
+    assert o.uuid == user.uuid
+
+    deleted_user = models.DeletedUser(uuid=user.uuid)
+    db_session.add(deleted_user)
+    db_session.delete(user)
+    db_session.commit()
+
+    o = db_session.query(models.User).where(models.User.uuid == user.uuid).one_or_none()
+    assert o is None
+
+    o = db_session.query(models.DeletedUser).where(models.DeletedUser.uuid == user.uuid).one()
+    assert o.uuid == user.uuid
+
+
+
+
+
