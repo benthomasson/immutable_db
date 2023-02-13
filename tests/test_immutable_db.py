@@ -1,16 +1,16 @@
 import logging
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload, scoped_session, sessionmaker
-from sqlalchemy import func
 
 from immutable_db.db import models
 
-logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
+
 
 @pytest.fixture(scope="session")
 def connection():
@@ -36,8 +36,6 @@ def db_session(setup_database, connection):
 
 
 def test_user(db_session):
-
-
     user = models.User()
     db_session.add(user)
     db_session.commit()
@@ -48,7 +46,6 @@ def test_user(db_session):
 
 
 def test_delete_user(db_session):
-
     user = models.User()
     db_session.add(user)
     db_session.commit()
@@ -57,7 +54,7 @@ def test_delete_user(db_session):
     o = db_session.query(models.User).where(models.User.uuid == user.uuid).one()
     assert o.uuid == user.uuid
 
-    deleted_user = models.DeletedUser(uuid=user.uuid)
+    deleted_user = models.DeletedUser(uuid=user.uuid, created_at=user.created_at)
     db_session.add(deleted_user)
     db_session.delete(user)
     db_session.commit()
@@ -65,10 +62,11 @@ def test_delete_user(db_session):
     o = db_session.query(models.User).where(models.User.uuid == user.uuid).one_or_none()
     assert o is None
 
-    o = db_session.query(models.DeletedUser).where(models.DeletedUser.uuid == user.uuid).one()
+    o = (
+        db_session.query(models.DeletedUser)
+        .where(models.DeletedUser.uuid == user.uuid)
+        .one()
+    )
     assert o.uuid == user.uuid
-
-
-
-
-
+    assert o.created_at == user.created_at
+    assert o.deleted_at == deleted_user.deleted_at
