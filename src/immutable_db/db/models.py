@@ -28,7 +28,7 @@ class User(Base):
 
     uuid = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     created_at = Column(DateTime, default=func.now(), nullable=False)
-    user_name = relationship("UserName", cascade="delete")
+    user_name = relationship("UserName", cascade="delete", uselist=False)
 
 
 class DeletedUser(Base):
@@ -38,6 +38,7 @@ class DeletedUser(Base):
     created_at = Column(DateTime, default=func.now(), nullable=False)
     deleted_at = Column(DateTime, default=func.now(), nullable=False)
 
+    user_name = relationship("DeletedUserName", uselist=False)
 
 class UserName(Base):
     __tablename__ = "user_name"
@@ -58,3 +59,4 @@ class DeletedUserName(Base):
     user_uuid = Column(UUID(as_uuid=True), ForeignKey("deleted_user.uuid"), nullable=False)
     name = Column(String(255), nullable=False)
 
+    user = relationship("DeletedUser", back_populates="user_name")
