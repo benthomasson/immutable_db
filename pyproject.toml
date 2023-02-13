@@ -21,6 +21,8 @@ classifiers = [
 "Homepage" = "https://github.com/benthomasson/immutable_db"
 "Bug Tracker" = "https://github.com/benthomasson/immutable_db/issues"
 
+[project.scripts]
+immutable-db-shell = "immutable_db.shell:main"
 
 [tool.pytest.ini_options]
 log_cli = false

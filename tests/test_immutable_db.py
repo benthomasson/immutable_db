@@ -1,4 +1,5 @@
 import logging
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import create_engine, func, select
@@ -45,6 +46,12 @@ def test_user(db_session):
     assert o.uuid == user.uuid
 
 
+def model_data(o):
+    data = o.__dict__.copy()
+    data.pop("_sa_instance_state")
+    return data
+
+
 def test_delete_user(db_session):
     user = models.User()
     db_session.add(user)
@@ -55,6 +62,7 @@ def test_delete_user(db_session):
     assert o.uuid == user.uuid
 
     deleted_user = models.DeletedUser(uuid=user.uuid, created_at=user.created_at)
+    deleted_user2 = models.DeletedUser(**model_data(user))
     db_session.add(deleted_user)
     db_session.delete(user)
     db_session.commit()
@@ -70,3 +78,41 @@ def test_delete_user(db_session):
     assert o.uuid == user.uuid
     assert o.created_at == user.created_at
     assert o.deleted_at == deleted_user.deleted_at
+
+
+def test_user_name(db_session):
+    user = models.User(uuid=uuid4())
+    name = models.UserName(name="test", user_uuid=user.uuid)
+    db_session.add(user)
+    db_session.add(name)
+    db_session.commit()
+    assert user.uuid
+
+    o = db_session.query(models.User).where(models.User.uuid == user.uuid).one()
+    assert o.uuid == user.uuid
+
+    o = db_session.query(models.UserName).where(models.UserName.name == "test").one()
+    assert o.user_uuid == user.uuid
+
+
+def test_delete_user_name(db_session):
+    user = models.User(uuid=uuid4())
+    name = models.UserName(name="test_delete", user_uuid=user.uuid)
+    db_session.add(user)
+    db_session.add(name)
+    db_session.commit()
+    assert user.uuid
+
+    o = db_session.query(models.User).where(models.User.uuid == user.uuid).one()
+    assert o.uuid == user.uuid
+
+    o = db_session.query(models.UserName).where(models.UserName.name == "test_delete").one()
+    assert o.user_uuid == user.uuid
+
+    #db_session.delete(name)
+    #db_session.commit()
+    db_session.delete(user)
+    db_session.commit()
+
+    o = db_session.query(models.UserName).where(models.UserName.name == "test_delete").all()
+    assert len(o) == 0
