@@ -14,6 +14,7 @@ class User(Base):
     uuid = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     user_name = relationship("UserName", cascade="delete", uselist=False)
+    applications = relationship("Application")
 
 
 class DeletedUser(Base):
@@ -24,6 +25,7 @@ class DeletedUser(Base):
     deleted_at = Column(DateTime, default=func.now(), nullable=False)
 
     user_name = relationship("DeletedUserName", uselist=False)
+    applications = relationship("DeletedApplication")
 
 
 class UserName(Base):
@@ -73,4 +75,34 @@ class Application(Base):
 
     users = relationship(
         "User", secondary="application_user", back_populates="applications"
+    )
+
+
+application_user = Table(
+    "deleted_application_user",
+    Base.metadata,
+    Column(
+        "application_uuid",
+        UUID(as_uuid=True),
+        ForeignKey("deleted_application.uuid"),
+        primary_key=True,
+    ),
+    Column(
+        "user_uuid",
+        UUID(as_uuid=True),
+        ForeignKey("deleted_user.uuid"),
+        primary_key=True,
+    ),
+)
+
+
+class DeletedApplication(Base):
+    __tablename__ = "deleted_application"
+
+    uuid = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    deleted_at = Column(DateTime, default=func.now(), nullable=False)
+
+    users = relationship(
+        "DeletedUser", secondary="application_user", back_populates="applications"
     )
