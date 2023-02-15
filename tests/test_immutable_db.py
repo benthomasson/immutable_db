@@ -2,13 +2,10 @@ import logging
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, func, select, insert
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import joinedload, scoped_session, sessionmaker
+from sqlalchemy import create_engine, select, insert
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 from immutable_db.db import models
-
-from datetime import datetime
 
 logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
@@ -208,10 +205,10 @@ def test_user_application(db_session):
     db_session.commit()
     app.users.append(user)
     db_session.commit()
-    #q = insert(models.application_user).values(
+    # q = insert(models.application_user).values(
     #    application_uuid=app.uuid, user_uuid=user.uuid, created_at=datetime.utcnow()
-    #)
-    #db_session.execute(q)
+    # )
+    # db_session.execute(q)
     assert user.uuid
 
     o = db_session.query(models.User).where(models.User.uuid == user.uuid).one()
@@ -236,27 +233,41 @@ def test_user_application_delete(db_session):
     db_session.commit()
     app.users.append(user)
     db_session.commit()
-    #q = insert(models.application_user).values(
+    # q = insert(models.application_user).values(
     #    application_uuid=app.uuid, user_uuid=user.uuid, created_at=datetime.utcnow()
-    #)
-    #db_session.execute(q)
-    assert user.uuid
+    # )
+    # db_session.execute(q)
+    assert user.uuid, "Expected user to have a uuid"
 
     o = db_session.query(models.User).where(models.User.uuid == user.uuid).one()
-    assert o.uuid == user.uuid
+    assert o.uuid == user.uuid, "Expected to find user by uuid"
 
     o = (
         db_session.query(models.Application)
         .where(models.Application.uuid == app.uuid)
         .one()
     )
-    assert o.uuid == app.uuid
+    assert o.uuid == app.uuid, "did not find app"
 
-    assert len(o.users) == 1
-    assert o.users[0].uuid == user.uuid
+    assert len(o.users) == 1, "user not added to application"
+    assert o.users[0].uuid == user.uuid, "user not added to application"
 
+    q = select(models.application_user).where(
+        models.application_user.c.user_uuid == user.uuid
+    )
+    assert db_session.execute(q).fetchone() is not None, "user not added to application"
+
+    # Save the user into the deleted table
     deleted_user = models.DeletedUser(**model_data(user))
+    db_session.add(deleted_user)
 
+    # Save the user application relationship into the deleted table
+    for an_app in user.applications:
+        q = insert(models.deleted_application_user).values(
+            user_uuid=user.uuid, application_uuid=an_app.uuid
+        )
+        db_session.execute(q)
+    # Delete the user
     db_session.delete(user)
     db_session.commit()
 
@@ -267,4 +278,23 @@ def test_user_application_delete(db_session):
     )
     assert o.uuid == app.uuid
 
-    assert len(o.users) == 0
+    assert len(o.users) == 0, "Expected no users"
+
+    o = (
+        db_session.query(models.DeletedUser)
+        .where(models.DeletedUser.uuid == user.uuid)
+        .one()
+    )
+    assert o.uuid == user.uuid, "Expected deleted user"
+
+    q = select(models.application_user).where(
+        models.application_user.c.user_uuid == user.uuid
+    )
+    assert db_session.execute(q).fetchone() is None, "Expected no application_user"
+
+    q = select(models.deleted_application_user).where(
+        models.deleted_application_user.c.user_uuid == user.uuid
+    )
+    assert (
+        db_session.execute(q).fetchone() is not None
+    ), "Expected deleted_application_user"
