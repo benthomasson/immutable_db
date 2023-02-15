@@ -2,7 +2,7 @@
 import IPython
 import os
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, insert, select, update, delete
 from sqlalchemy.orm import Session, joinedload
 from .db import models
 from imp import reload

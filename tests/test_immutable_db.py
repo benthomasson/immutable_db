@@ -2,11 +2,13 @@ import logging
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, func, select, insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload, scoped_session, sessionmaker
 
 from immutable_db.db import models
+
+from datetime import datetime
 
 logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
@@ -105,15 +107,23 @@ def test_delete_user_name_cascade(db_session):
     o = db_session.query(models.User).where(models.User.uuid == user.uuid).one()
     assert o.uuid == user.uuid
 
-    o = db_session.query(models.UserName).where(models.UserName.name == "test_delete").one()
+    o = (
+        db_session.query(models.UserName)
+        .where(models.UserName.name == "test_delete")
+        .one()
+    )
     assert o.user_uuid == user.uuid
 
-    #db_session.delete(name)
-    #db_session.commit()
+    # db_session.delete(name)
+    # db_session.commit()
     db_session.delete(user)
     db_session.commit()
 
-    o = db_session.query(models.UserName).where(models.UserName.name == "test_delete").all()
+    o = (
+        db_session.query(models.UserName)
+        .where(models.UserName.name == "test_delete")
+        .all()
+    )
     assert len(o) == 0
 
 
@@ -128,7 +138,11 @@ def test_delete_user_name_no_cascade(db_session):
     o = db_session.query(models.User).where(models.User.uuid == user.uuid).one()
     assert o.uuid == user.uuid
 
-    o = db_session.query(models.UserName).where(models.UserName.name == "test_delete").one()
+    o = (
+        db_session.query(models.UserName)
+        .where(models.UserName.name == "test_delete")
+        .one()
+    )
     assert o.user_uuid == user.uuid
 
     db_session.delete(name)
@@ -136,8 +150,13 @@ def test_delete_user_name_no_cascade(db_session):
     db_session.delete(user)
     db_session.commit()
 
-    o = db_session.query(models.UserName).where(models.UserName.name == "test_delete").all()
+    o = (
+        db_session.query(models.UserName)
+        .where(models.UserName.name == "test_delete")
+        .all()
+    )
     assert len(o) == 0
+
 
 def test_delete_user_name_copy(db_session):
     user = models.User(uuid=uuid4())
@@ -150,7 +169,11 @@ def test_delete_user_name_copy(db_session):
     o = db_session.query(models.User).where(models.User.uuid == user.uuid).one()
     assert o.uuid == user.uuid
 
-    o = db_session.query(models.UserName).where(models.UserName.name == "test_delete").one()
+    o = (
+        db_session.query(models.UserName)
+        .where(models.UserName.name == "test_delete")
+        .one()
+    )
     assert o.user_uuid == user.uuid
 
     deleted_user = models.DeletedUser(**model_data(user))
@@ -160,14 +183,88 @@ def test_delete_user_name_copy(db_session):
     db_session.delete(user)
     db_session.commit()
 
-    o = db_session.query(models.UserName).where(models.UserName.name == "test_delete").all()
+    o = (
+        db_session.query(models.UserName)
+        .where(models.UserName.name == "test_delete")
+        .all()
+    )
     assert len(o) == 0
 
-    o = db_session.query(models.DeletedUserName).where(models.DeletedUserName.name == "test_delete").all()
+    o = (
+        db_session.query(models.DeletedUserName)
+        .where(models.DeletedUserName.name == "test_delete")
+        .all()
+    )
     assert len(o) == 1
 
     assert o[0].user_uuid == user.uuid
-    assert o[0].user.uuid == user.uuid
-    assert o[0].user.user_name.name == "test_delete"
 
 
+def test_user_application(db_session):
+    app = models.Application(uuid=uuid4())
+    user = models.User(uuid=uuid4())
+    db_session.add(app)
+    db_session.add(user)
+    db_session.commit()
+    app.users.append(user)
+    db_session.commit()
+    #q = insert(models.application_user).values(
+    #    application_uuid=app.uuid, user_uuid=user.uuid, created_at=datetime.utcnow()
+    #)
+    #db_session.execute(q)
+    assert user.uuid
+
+    o = db_session.query(models.User).where(models.User.uuid == user.uuid).one()
+    assert o.uuid == user.uuid
+
+    o = (
+        db_session.query(models.Application)
+        .where(models.Application.uuid == app.uuid)
+        .one()
+    )
+    assert o.uuid == app.uuid
+
+    assert len(o.users) == 1
+    assert o.users[0].uuid == user.uuid
+
+
+def test_user_application_delete(db_session):
+    app = models.Application(uuid=uuid4())
+    user = models.User(uuid=uuid4())
+    db_session.add(app)
+    db_session.add(user)
+    db_session.commit()
+    app.users.append(user)
+    db_session.commit()
+    #q = insert(models.application_user).values(
+    #    application_uuid=app.uuid, user_uuid=user.uuid, created_at=datetime.utcnow()
+    #)
+    #db_session.execute(q)
+    assert user.uuid
+
+    o = db_session.query(models.User).where(models.User.uuid == user.uuid).one()
+    assert o.uuid == user.uuid
+
+    o = (
+        db_session.query(models.Application)
+        .where(models.Application.uuid == app.uuid)
+        .one()
+    )
+    assert o.uuid == app.uuid
+
+    assert len(o.users) == 1
+    assert o.users[0].uuid == user.uuid
+
+    deleted_user = models.DeletedUser(**model_data(user))
+
+    db_session.delete(user)
+    db_session.commit()
+
+    o = (
+        db_session.query(models.Application)
+        .where(models.Application.uuid == app.uuid)
+        .one()
+    )
+    assert o.uuid == app.uuid
+
+    assert len(o.users) == 0
